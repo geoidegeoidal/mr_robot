@@ -63,6 +63,18 @@ class SantiagoUrbanEnv(gym.Env):
         self.end_x = end_data["x"]
         self.end_y = end_data["y"]
 
+        # ── Precomputar distancias reales (GPS / Grafo) ──
+        logger.info("Precálculo de distancias reales por las calles (Dijkstra)...")
+        # Al revertir el grafo, calculamos las rutas más cortas *hacia* end_node
+        try:
+            G_rev = self.G.reverse(copy=False)
+            self.node_distances = nx.single_source_dijkstra_path_length(G_rev, end_node, weight='length')
+            logger.info(f"Distancias calculadas para {len(self.node_distances)} nodos accesibles.")
+        except Exception as e:
+            logger.error(f"Error precalculando distancias: {e}")
+            self.node_distances = {}
+
+
         # ── Spaces ──
         # State: [distancia_relativa, ángulo_normalizado, grado_normalizado, indicador_avenida]
         self.observation_space = spaces.Box(
@@ -256,11 +268,17 @@ class SantiagoUrbanEnv(gym.Env):
         return info
 
     def _distance_to_goal(self, node):
-        """Distancia euclidiana en metros (UTM) al nodo objetivo."""
+        """Distancia real caminando (A*/Dijkstra) al nodo objetivo."""
+        if node in self.node_distances:
+            return self.node_distances[node]
+        
+        # Si el nodo no tiene ruta posible al destino (desconectado), 
+        # damos una penalización gigante basada en la euclidiana
         nd = self.G.nodes[node]
         dx = nd["x"] - self.end_x
         dy = nd["y"] - self.end_y
-        return math.sqrt(dx * dx + dy * dy)
+        euclidean = math.sqrt(dx * dx + dy * dy)
+        return euclidean + 50000.0  # Penalización enorme
 
     def _update_neighbors(self):
         """Actualiza la lista ordenada de vecinos del nodo actual."""

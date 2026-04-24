@@ -224,6 +224,7 @@
         </div>
         <button class="ctrl-btn active" id="btn-follow">◎ FOLLOW</button>
         <button class="ctrl-btn" id="btn-filter">★ SUCCESS</button>
+        <button class="ctrl-btn" id="btn-top3">🏆 TOP 3</button>
     </div>
 
     <script>
@@ -237,6 +238,7 @@
         let isPlaying = false;
         let isFollowing = true;
         let showOnlySuccess = false;
+        let showTop3 = false;
         let speed = 15; // frames per tick
         let animTimer = null;
 
@@ -521,7 +523,17 @@
 
             document.getElementById('btn-filter').addEventListener('click', () => {
                 showOnlySuccess = !showOnlySuccess;
+                showTop3 = false;
+                document.getElementById('btn-top3').classList.remove('active');
                 document.getElementById('btn-filter').classList.toggle('active', showOnlySuccess);
+                applyFilter();
+            });
+
+            document.getElementById('btn-top3').addEventListener('click', () => {
+                showTop3 = !showTop3;
+                showOnlySuccess = false;
+                document.getElementById('btn-filter').classList.remove('active');
+                document.getElementById('btn-top3').classList.toggle('active', showTop3);
                 applyFilter();
             });
         }
@@ -529,6 +541,8 @@
         function applyFilter() {
             if (showOnlySuccess) {
                 filteredEpisodes = episodes.filter(e => e.result === 'success');
+            } else if (showTop3) {
+                filteredEpisodes = [...episodes].sort((a, b) => b.total_reward - a.total_reward).slice(0, 3);
             } else {
                 filteredEpisodes = episodes;
             }

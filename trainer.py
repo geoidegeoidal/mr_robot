@@ -36,7 +36,7 @@ START_POI = "Barrio Bellavista, Santiago, Chile"
 END_POI = "Plaza de Maipú, Maipú, Chile"
 
 # Hiperparámetros de entrenamiento
-TOTAL_TIMESTEPS = 50_000        # Escalable; 50K para prueba rápida
+TOTAL_TIMESTEPS = 500_000       # Con el nuevo "GPS", 500K es suficiente para llegar
 LEARNING_RATE = 3e-4
 N_STEPS = 2048
 BATCH_SIZE = 64
@@ -44,7 +44,7 @@ N_EPOCHS = 10
 GAMMA = 0.995                   # Descuento alto para rutas largas
 GAE_LAMBDA = 0.95
 CLIP_RANGE = 0.2
-ENT_COEF = 0.01                 # Exploración
+ENT_COEF = 0.05                 # ¡MUTACIÓN! Aumentado a 0.05 para forzar exploración aleatoria
 MAX_STEPS_PER_EPISODE = 8000    # Permitir rutas largas en RM completa
 
 # Output

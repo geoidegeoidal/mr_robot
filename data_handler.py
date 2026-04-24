@@ -137,9 +137,15 @@ def get_route_nodes(start_poi, end_poi, G_projected, G_latlon):
     end_coords = ox.geocoder.geocode(end_poi)
     logger.info(f"  → Coordenadas: {end_coords}")
 
-    # Encontrar nodos más cercanos en el grafo lat/lon
-    start_node = ox.distance.nearest_nodes(G_latlon, X=start_coords[1], Y=start_coords[0])
-    end_node = ox.distance.nearest_nodes(G_latlon, X=end_coords[1], Y=end_coords[0])
+    # Transformar coordenadas geocodificadas (lat/lon) a UTM para buscar en grafo proyectado
+    latlon_to_utm = Transformer.from_crs("EPSG:4326", TARGET_CRS, always_xy=True)
+
+    start_utm_x, start_utm_y = latlon_to_utm.transform(start_coords[1], start_coords[0])
+    end_utm_x, end_utm_y = latlon_to_utm.transform(end_coords[1], end_coords[0])
+
+    # Encontrar nodos más cercanos en el grafo proyectado (UTM)
+    start_node = ox.distance.nearest_nodes(G_projected, X=start_utm_x, Y=start_utm_y)
+    end_node = ox.distance.nearest_nodes(G_projected, X=end_utm_x, Y=end_utm_y)
 
     logger.info(f"Nodo origen: {start_node}")
     logger.info(f"Nodo destino: {end_node}")

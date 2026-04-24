@@ -36,7 +36,7 @@ START_POI = "Barrio Bellavista, Santiago, Chile"
 END_POI = "Plaza de Maipú, Maipú, Chile"
 
 # Hiperparámetros de entrenamiento
-TOTAL_TIMESTEPS = 500_000       # Escalable; 500K como punto de partida
+TOTAL_TIMESTEPS = 50_000        # Escalable; 50K para prueba rápida
 LEARNING_RATE = 3e-4
 N_STEPS = 2048
 BATCH_SIZE = 64
@@ -81,8 +81,13 @@ class TrajectoryLoggerCallback(BaseCallback):
 
         for i, done in enumerate(dones):
             if done:
-                # Obtener datos del episodio del environment
-                traj_data = self.env.get_trajectory_data()
+                # Obtener datos del episodio desde el info dict (para evitar data de env reset)
+                info = infos[i]
+                traj_data = info.get("trajectory_data")
+                
+                # Fallback por si acaso (aunque DummyVecEnv preserva el info terminal)
+                if not traj_data:
+                    traj_data = self.env.envs[i].get_trajectory_data()
 
                 if traj_data["result"] == "success":
                     self.successes += 1
@@ -175,7 +180,6 @@ def train():
         clip_range=CLIP_RANGE,
         ent_coef=ENT_COEF,
         verbose=1,
-        tensorboard_log=os.path.join(OUTPUT_DIR, "tb_logs"),
     )
 
     model.learn(

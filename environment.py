@@ -244,13 +244,16 @@ class SantiagoUrbanEnv(gym.Env):
 
     def _get_info(self):
         """Retorna info dict del paso actual."""
-        return {
+        info = {
             "node_id": self.current_node,
             "step": self.current_step,
             "distance_to_goal": self._distance_to_goal(self.current_node),
             "episode_reward": self.episode_reward,
             "result": self.episode_result,
         }
+        if self.episode_result is not None:
+            info["trajectory_data"] = self.get_trajectory_data()
+        return info
 
     def _distance_to_goal(self, node):
         """Distancia euclidiana en metros (UTM) al nodo objetivo."""

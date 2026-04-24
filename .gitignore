@@ -1,0 +1,37 @@
+# === Generated data (large files) ===
+santiago_master_walk.graphml
+streets.geojson
+training_viz.json
+
+# === Model checkpoints ===
+*.zip
+models/
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# === Virtual environments ===
+venv/
+.venv/
+env/
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Logs ===
+*.log

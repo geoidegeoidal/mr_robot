@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MR_ROBOT — Santiago Urban Navigator</title>
+    <meta name="description" content="Visualización cinemática de IA navegando la red peatonal de Santiago de Chile">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #050505;
+            color: #e0e0e0;
+            font-family: 'Share Tech Mono', monospace;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+        #map-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            cursor: grab;
+        }
+        #map-canvas:active { cursor: grabbing; }
+
+        /* ── HUD Overlay ── */
+        #hud-overlay {
+            position: fixed;
+            top: 20px; left: 20px;
+            z-index: 100;
+            pointer-events: none;
+        }
+        .hud-title {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            font-size: 22px;
+            color: #00f2ff;
+            text-shadow: 0 0 20px rgba(0,242,255,0.6), 0 0 40px rgba(0,242,255,0.3);
+            letter-spacing: 3px;
+            margin-bottom: 4px;
+        }
+        .hud-subtitle {
+            font-size: 11px;
+            color: #555;
+            letter-spacing: 2px;
+            margin-bottom: 16px;
+        }
+        .hud-stat {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 6px;
+            line-height: 1.4;
+        }
+        .hud-stat .val {
+            color: #00f2ff;
+            font-weight: bold;
+            text-shadow: 0 0 8px rgba(0,242,255,0.4);
+        }
+        .hud-stat .val.success { color: #00ff88; text-shadow: 0 0 8px rgba(0,255,136,0.4); }
+        .hud-stat .val.fail { color: #ff3366; text-shadow: 0 0 8px rgba(255,51,102,0.4); }
+        .hud-route {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border: 1px solid #1a1a1a;
+            background: rgba(5,5,5,0.85);
+            border-radius: 4px;
+        }
+        .hud-route .label { color: #555; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; }
+        .hud-route .poi { color: #ff00ff; font-size: 13px; margin-top: 2px;
+            text-shadow: 0 0 10px rgba(255,0,255,0.4); }
+        .hud-route .arrow { color: #333; font-size: 16px; margin: 4px 0; }
+        .hud-route .poi.dest { color: #ffff00; text-shadow: 0 0 10px rgba(255,255,0,0.4); }
+
+        /* ── Controls Panel ── */
+        #controls-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 24px;
+            background: rgba(10,10,10,0.92);
+            border: 1px solid #1a1a1a;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+        .ctrl-btn {
+            background: none;
+            border: 1px solid #333;
+            color: #00f2ff;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 13px;
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .ctrl-btn:hover {
+            background: rgba(0,242,255,0.1);
+            border-color: #00f2ff;
+            box-shadow: 0 0 12px rgba(0,242,255,0.2);
+        }
+        .ctrl-btn.active {
+            background: rgba(0,242,255,0.15);
+            border-color: #00f2ff;
+        }
+        .ctrl-label {
+            font-size: 11px;
+            color: #555;
+            letter-spacing: 1px;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 120px;
+            height: 4px;
+            background: #1a1a1a;
+            border-radius: 2px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: #00f2ff;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(0,242,255,0.5);
+        }
+        #episode-display {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 12px;
+            color: #00f2ff;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        /* ── Loading screen ── */
+        #loading-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: #050505;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .loading-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            color: #00f2ff;
+            letter-spacing: 4px;
+            animation: pulse 1.5s infinite;
+        }
+        .loading-sub {
+            font-size: 12px;
+            color: #333;
+            margin-top: 12px;
+            letter-spacing: 2px;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+
+        /* ── Scanline overlay ── */
+        #scanlines {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.03) 2px,
+                rgba(0,0,0,0.03) 4px
+            );
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="loading-text">INITIALIZING</div>
+        <div class="loading-sub">loading neural pathways...</div>
+    </div>
+
+    <canvas id="map-canvas"></canvas>
+    <div id="scanlines"></div>
+
+    <div id="hud-overlay">
+        <div class="hud-title">MR_ROBOT</div>
+        <div class="hud-subtitle">SANTIAGO URBAN NAVIGATOR</div>
+        <div class="hud-stat">EPISODE <span class="val" id="hud-episode">—</span></div>
+        <div class="hud-stat">STEP <span class="val" id="hud-step">—</span> / <span id="hud-total-steps">—</span></div>
+        <div class="hud-stat">REWARD <span class="val" id="hud-reward">—</span></div>
+        <div class="hud-stat">STATUS <span class="val" id="hud-status">STANDBY</span></div>
+        <div class="hud-route">
+            <div class="label">ORIGIN</div>
+            <div class="poi" id="hud-origin">—</div>
+            <div class="arrow">↓</div>
+            <div class="label">DESTINATION</div>
+            <div class="poi dest" id="hud-dest">—</div>
+        </div>
+    </div>
+
+    <div id="controls-panel">
+        <button class="ctrl-btn" id="btn-play">▶ PLAY</button>
+        <button class="ctrl-btn" id="btn-prev">◀</button>
+        <button class="ctrl-btn" id="btn-next">▶</button>
+        <div>
+            <div class="ctrl-label">EPISODE</div>
+            <input type="range" id="slider-episode" min="0" max="0" value="0">
+        </div>
+        <div id="episode-display">0 / 0</div>
+        <div>
+            <div class="ctrl-label">SPEED</div>
+            <input type="range" id="slider-speed" min="1" max="60" value="15">
+        </div>
+        <button class="ctrl-btn active" id="btn-follow">◎ FOLLOW</button>
+        <button class="ctrl-btn" id="btn-filter">★ SUCCESS</button>
+    </div>
+
+    <script>
+    (function() {
+        // ── State ──
+        let vizData = null;
+        let episodes = [];
+        let filteredEpisodes = [];
+        let currentEpIdx = 0;
+        let currentFrame = 0;
+        let isPlaying = false;
+        let isFollowing = true;
+        let showOnlySuccess = false;
+        let speed = 15; // frames per tick
+        let animTimer = null;
+
+        // ── Canvas ──
+        const canvas = document.getElementById('map-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        // ── Geo projection ──
+        let projection = null;
+        let currentTransform = d3.zoomIdentity;
+        let streetsData = null;
+
+        // ── D3 Zoom ──
+        const zoomBehavior = d3.zoom()
+            .scaleExtent([0.5, 200])
+            .on('zoom', (event) => {
+                currentTransform = event.transform;
+                if (!isPlaying) render();
+            });
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width * devicePixelRatio;
+            canvas.height = height * devicePixelRatio;
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        }
+
+        // ── Render ──
+        function render() {
+            ctx.save();
+            ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+            ctx.clearRect(0, 0, width, height);
+
+            // Background
+            ctx.fillStyle = '#050505';
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.translate(currentTransform.x, currentTransform.y);
+            ctx.scale(currentTransform.k, currentTransform.k);
+
+            // ── Draw streets ──
+            if (streetsData) {
+                ctx.strokeStyle = '#1a1a1a';
+                ctx.lineWidth = 0.8 / currentTransform.k;
+                ctx.beginPath();
+                streetsData.forEach(seg => {
+                    for (let i = 0; i < seg.length - 1; i++) {
+                        ctx.moveTo(seg[i][0], seg[i][1]);
+                        ctx.lineTo(seg[i+1][0], seg[i+1][1]);
+                    }
+                });
+                ctx.stroke();
+            }
+
+            // ── Draw trail (already visited) ──
+            const ep = filteredEpisodes[currentEpIdx];
+            if (ep && ep._projected && currentFrame > 0) {
+                const trail = ep._projected;
+                const end = Math.min(currentFrame, trail.length);
+
+                // Glow trail
+                ctx.save();
+                ctx.shadowColor = '#00f2ff';
+                ctx.shadowBlur = 15 / currentTransform.k;
+                ctx.strokeStyle = '#00f2ff';
+                ctx.lineWidth = 2.5 / currentTransform.k;
+                ctx.globalAlpha = 0.7;
+                ctx.beginPath();
+                ctx.moveTo(trail[0][0], trail[0][1]);
+                for (let i = 1; i < end; i++) {
+                    ctx.lineTo(trail[i][0], trail[i][1]);
+                }
+                ctx.stroke();
+                ctx.restore();
+
+                // Brighter recent trail (last 30 steps)
+                const recentStart = Math.max(0, end - 30);
+                ctx.save();
+                ctx.shadowColor = '#00f2ff';
+                ctx.shadowBlur = 25 / currentTransform.k;
+                ctx.strokeStyle = '#00f2ff';
+                ctx.lineWidth = 3 / currentTransform.k;
+                ctx.globalAlpha = 1;
+                ctx.beginPath();
+                ctx.moveTo(trail[recentStart][0], trail[recentStart][1]);
+                for (let i = recentStart + 1; i < end; i++) {
+                    ctx.lineTo(trail[i][0], trail[i][1]);
+                }
+                ctx.stroke();
+                ctx.restore();
+
+                // ── Robot dot ──
+                const robotPos = trail[Math.min(end - 1, trail.length - 1)];
+                const r = 5 / currentTransform.k;
+
+                // Outer glow
+                ctx.save();
+                ctx.shadowColor = '#00f2ff';
+                ctx.shadowBlur = 30 / currentTransform.k;
+                ctx.fillStyle = '#00f2ff';
+                ctx.beginPath();
+                ctx.arc(robotPos[0], robotPos[1], r * 2, 0, Math.PI * 2);
+                ctx.globalAlpha = 0.3;
+                ctx.fill();
+                ctx.restore();
+
+                // Inner dot
+                ctx.save();
+                ctx.shadowColor = '#ffffff';
+                ctx.shadowBlur = 10 / currentTransform.k;
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(robotPos[0], robotPos[1], r, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            // ── Origin marker ──
+            if (ep && ep._projected && ep._projected.length > 0) {
+                const origin = ep._projected[0];
+                drawPOIMarker(origin, '#ff00ff', 'A');
+            }
+
+            // ── Destination marker ──
+            if (ep && ep._projected && ep._projected.length > 1) {
+                const dest = ep._projected[ep._projected.length - 1];
+                if (ep.result === 'success') {
+                    drawPOIMarker(dest, '#ffff00', 'B');
+                }
+            }
+
+            ctx.restore();
+        }
+
+        function drawPOIMarker(pos, color, label) {
+            const r = 7 / currentTransform.k;
+            ctx.save();
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 20 / currentTransform.k;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2 / currentTransform.k;
+            ctx.beginPath();
+            ctx.arc(pos[0], pos[1], r, 0, Math.PI * 2);
+            ctx.stroke();
+            // Label
+            ctx.fillStyle = color;
+            ctx.shadowBlur = 10 / currentTransform.k;
+            ctx.font = `${12 / currentTransform.k}px Orbitron`;
+            ctx.textAlign = 'center';
+            ctx.fillText(label, pos[0], pos[1] - r * 2);
+            ctx.restore();
+        }
+
+        // ── Animation ──
+        function startAnimation() {
+            if (animTimer) animTimer.stop();
+            isPlaying = true;
+            document.getElementById('btn-play').textContent = '⏸ PAUSE';
+
+            animTimer = d3.timer(() => {
+                const ep = filteredEpisodes[currentEpIdx];
+                if (!ep || !ep._projected) { stopAnimation(); return; }
+
+                currentFrame += speed;
+
+                if (currentFrame >= ep._projected.length) {
+                    currentFrame = ep._projected.length;
+                    updateHUD();
+                    render();
+                    stopAnimation();
+                    // Auto-advance after 1.5s
+                    setTimeout(() => {
+                        if (currentEpIdx < filteredEpisodes.length - 1) {
+                            currentEpIdx++;
+                            currentFrame = 0;
+                            updateSlider();
+                            updateHUD();
+                            startAnimation();
+                        }
+                    }, 1500);
+                    return;
+                }
+
+                // Follow camera
+                if (isFollowing && ep._projected[currentFrame]) {
+                    const target = ep._projected[Math.min(currentFrame, ep._projected.length - 1)];
+                    const scale = currentTransform.k;
+                    const tx = width / 2 - target[0] * scale;
+                    const ty = height / 2 - target[1] * scale;
+
+                    // LERP for smooth follow
+                    const lerpFactor = 0.08;
+                    const newX = currentTransform.x + (tx - currentTransform.x) * lerpFactor;
+                    const newY = currentTransform.y + (ty - currentTransform.y) * lerpFactor;
+                    currentTransform = d3.zoomIdentity.translate(newX, newY).scale(scale);
+
+                    // Sync zoom behavior
+                    d3.select(canvas).call(zoomBehavior.transform, currentTransform);
+                }
+
+                updateHUD();
+                render();
+            });
+        }
+
+        function stopAnimation() {
+            if (animTimer) animTimer.stop();
+            isPlaying = false;
+            document.getElementById('btn-play').textContent = '▶ PLAY';
+        }
+
+        // ── HUD Update ──
+        function updateHUD() {
+            const ep = filteredEpisodes[currentEpIdx];
+            if (!ep) return;
+
+            document.getElementById('hud-episode').textContent = ep.id;
+            document.getElementById('hud-step').textContent = Math.min(currentFrame, ep.steps);
+            document.getElementById('hud-total-steps').textContent = ep.steps;
+            document.getElementById('hud-reward').textContent = ep.total_reward;
+
+            const statusEl = document.getElementById('hud-status');
+            if (currentFrame >= (ep._projected ? ep._projected.length : ep.steps)) {
+                statusEl.textContent = ep.result.toUpperCase();
+                statusEl.className = 'val ' + (ep.result === 'success' ? 'success' : 'fail');
+            } else {
+                statusEl.textContent = 'NAVIGATING';
+                statusEl.className = 'val';
+            }
+        }
+
+        function updateSlider() {
+            const slider = document.getElementById('slider-episode');
+            slider.value = currentEpIdx;
+            document.getElementById('episode-display').textContent =
+                `${currentEpIdx + 1} / ${filteredEpisodes.length}`;
+        }
+
+        // ── Controls ──
+        function setupControls() {
+            document.getElementById('btn-play').addEventListener('click', () => {
+                if (isPlaying) stopAnimation();
+                else {
+                    if (currentFrame >= (filteredEpisodes[currentEpIdx]?._projected?.length || 0)) {
+                        currentFrame = 0;
+                    }
+                    startAnimation();
+                }
+            });
+
+            document.getElementById('btn-prev').addEventListener('click', () => {
+                stopAnimation();
+                if (currentEpIdx > 0) { currentEpIdx--; currentFrame = 0; updateSlider(); updateHUD(); render(); }
+            });
+
+            document.getElementById('btn-next').addEventListener('click', () => {
+                stopAnimation();
+                if (currentEpIdx < filteredEpisodes.length - 1) { currentEpIdx++; currentFrame = 0; updateSlider(); updateHUD(); render(); }
+            });
+
+            document.getElementById('slider-episode').addEventListener('input', (e) => {
+                stopAnimation();
+                currentEpIdx = parseInt(e.target.value);
+                currentFrame = 0;
+                updateSlider();
+                updateHUD();
+                render();
+            });
+
+            document.getElementById('slider-speed').addEventListener('input', (e) => {
+                speed = parseInt(e.target.value);
+            });
+
+            document.getElementById('btn-follow').addEventListener('click', () => {
+                isFollowing = !isFollowing;
+                document.getElementById('btn-follow').classList.toggle('active', isFollowing);
+            });
+
+            document.getElementById('btn-filter').addEventListener('click', () => {
+                showOnlySuccess = !showOnlySuccess;
+                document.getElementById('btn-filter').classList.toggle('active', showOnlySuccess);
+                applyFilter();
+            });
+        }
+
+        function applyFilter() {
+            if (showOnlySuccess) {
+                filteredEpisodes = episodes.filter(e => e.result === 'success');
+            } else {
+                filteredEpisodes = episodes;
+            }
+            currentEpIdx = 0;
+            currentFrame = 0;
+            const slider = document.getElementById('slider-episode');
+            slider.max = Math.max(0, filteredEpisodes.length - 1);
+            updateSlider();
+            updateHUD();
+            render();
+        }
+
+        // ── Data Loading ──
+        async function loadData() {
+            try {
+                // Load training viz data
+                vizData = await d3.json('training_viz.json');
+                episodes = vizData.episodes || [];
+
+                // Set metadata in HUD
+                if (vizData.metadata) {
+                    document.getElementById('hud-origin').textContent = vizData.metadata.start_poi || '—';
+                    document.getElementById('hud-dest').textContent = vizData.metadata.end_poi || '—';
+                }
+
+                // Load streets GeoJSON
+                let streetsGeo = null;
+                try {
+                    streetsGeo = await d3.json('streets.geojson');
+                } catch(e) {
+                    console.warn('streets.geojson not found, rendering without street layer');
+                }
+
+                // ── Build projection ──
+                // Collect all coords from episodes to build extent
+                let allCoords = [];
+                episodes.forEach(ep => {
+                    if (ep.path) ep.path.forEach(p => allCoords.push(p));
+                });
+
+                if (allCoords.length === 0) {
+                    throw new Error('No episode paths found in training_viz.json');
+                }
+
+                const latExtent = d3.extent(allCoords, d => d[0]);
+                const lonExtent = d3.extent(allCoords, d => d[1]);
+
+                // Mercator projection fitted to the data
+                projection = d3.geoMercator()
+                    .center([(lonExtent[0] + lonExtent[1]) / 2, (latExtent[0] + latExtent[1]) / 2])
+                    .scale(width * 80)
+                    .translate([width / 2, height / 2]);
+
+                // Project episode paths
+                episodes.forEach(ep => {
+                    if (ep.path) {
+                        ep._projected = ep.path.map(p => projection([p[1], p[0]]));
+                    }
+                });
+
+                // Project streets
+                if (streetsGeo && streetsGeo.features) {
+                    streetsData = [];
+                    streetsGeo.features.forEach(feature => {
+                        const geom = feature.geometry;
+                        if (geom.type === 'LineString') {
+                            streetsData.push(geom.coordinates.map(c => projection(c)));
+                        } else if (geom.type === 'MultiLineString') {
+                            geom.coordinates.forEach(line => {
+                                streetsData.push(line.map(c => projection(c)));
+                            });
+                        }
+                    });
+                }
+
+                // ── Init filter and zoom ──
+                filteredEpisodes = episodes;
+                const slider = document.getElementById('slider-episode');
+                slider.max = Math.max(0, episodes.length - 1);
+
+                // Initial zoom: fit to first episode
+                if (filteredEpisodes[0] && filteredEpisodes[0]._projected) {
+                    const pts = filteredEpisodes[0]._projected;
+                    const xExt = d3.extent(pts, d => d[0]);
+                    const yExt = d3.extent(pts, d => d[1]);
+                    const dx = xExt[1] - xExt[0];
+                    const dy = yExt[1] - yExt[0];
+                    const scale = Math.min(width / dx, height / dy) * 0.6;
+                    const cx = (xExt[0] + xExt[1]) / 2;
+                    const cy = (yExt[0] + yExt[1]) / 2;
+                    currentTransform = d3.zoomIdentity
+                        .translate(width / 2 - cx * scale, height / 2 - cy * scale)
+                        .scale(scale);
+                    d3.select(canvas).call(zoomBehavior.transform, currentTransform);
+                }
+
+                updateHUD();
+                render();
+
+                // Hide loading
+                document.getElementById('loading-screen').style.display = 'none';
+
+            } catch (err) {
+                console.error('Error loading data:', err);
+                document.querySelector('.loading-text').textContent = 'ERROR';
+                document.querySelector('.loading-sub').textContent = err.message;
+            }
+        }
+
+        // ── Init ──
+        window.addEventListener('resize', () => { resize(); render(); });
+        resize();
+        d3.select(canvas).call(zoomBehavior);
+        setupControls();
+        loadData();
+
+    })();
+    </script>
+</body>
+</html>

@@ -1,8 +1,8 @@
-# 🤖 MR_ROBOT — Santiago Urban Navigator (Evolutionary Edition)
+# 🤖 MR_ROBOT — Santiago Urban Navigator (Swarm Edition)
 
 Pipeline de Reinforcement Learning para entrenar una IA que navegue de forma autónoma por la red peatonal de la Región Metropolitana de Santiago, Chile.
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue?style=flat-square)
+![Python](https://img.shields.io/badge/Python-3.13-blue?style=flat-square)
 ![D3.js](https://img.shields.io/badge/D3.js-v7-orange?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
@@ -12,7 +12,7 @@ Pipeline de Reinforcement Learning para entrenar una IA que navegue de forma aut
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │  data_handler.py│────▶│  environment.py  │────▶│   trainer.py    │
 │  OSMnx + Grafo  │     │  Gymnasium Env   │     │  MaskablePPO    │
-│  Caché RM UTM   │     │  GPS (Dijkstra)  │     │  Mutaciones RL  │
+│  Smart Parsing  │     │  GPS (Dijkstra)  │     │  15 Swarm Envs  │
 └─────────────────┘     └─────────────────┘     └────────┬────────┘
                                                           │
                                                           ▼
@@ -34,11 +34,11 @@ Pipeline de Reinforcement Learning para entrenar una IA que navegue de forma aut
 ### 🛰️ Navegación por "GPS" de Grafo (Dense Reward)
 A diferencia de otros modelos que usan línea recta, MR_ROBOT precalcula el **árbol de distancias reales por calles (Dijkstra)** desde cada nodo hasta el objetivo. Esto le da un "sentido del olfato" perfecto: el robot sabe exactamente si doblar en una esquina lo acerca o lo aleja del destino caminando, no volando.
 
-### 🧬 Mutaciones Evolutivas (Entropy Exploration)
-Usamos un coeficiente de entropía elevado (`ENT_COEF = 0.05`) para forzar al robot a probar "mutaciones" constantes en su ruta. Esto evita que se quede estancado en parques o rotondas y lo obliga a descubrir nuevas variantes de la ruta óptima.
+### 🧬 Inteligencia de Enjambre (Vectorized Training)
+Hemos implementado **15 entornos en paralelo** (`N_ENVS = 15`). Esto significa que 15 robots exploran la ciudad simultáneamente, compartiendo sus éxitos y fracasos para estabilizar y acelerar el aprendizaje del modelo central.
 
-### 🌃 Storytelling: Misión Nocturna
-El entrenamiento está configurado por defecto para la ruta **Barrio Bellavista → Plaza de Maipú** (~15 km). Una navegación crítica a través de la red peatonal nocturna de Santiago.
+### 📍 Smart Parsing (Texto o Coordenadas)
+El sistema resuelve automáticamente si le pasas una dirección textual ("Plaza Italia") o coordenadas geográficas directas ("-33.43, -70.63").
 
 ## ⚡ Setup Rápido
 
@@ -54,18 +54,18 @@ pip install -r requirements.txt
 ## 🚀 Ejecución del Pipeline
 
 ```bash
-# Entrenar (Carga el mapa y precalcula el GPS de grafo)
+# Entrenar con ruta por defecto (Bellavista -> Maipú)
 python trainer.py
+
+# Entrenar con ruta personalizada (Texto)
+python trainer.py --start "Cerro Santa Lucia, Santiago" --end "Costanera Center, Providencia"
+
+# Entrenar con coordenadas exactas
+python trainer.py --start "-33.4372, -70.6342" --end "-33.4025, -70.5802"
 
 # Evaluar modelo entrenado
 python trainer.py eval
 ```
-
-### ¿Qué pasa durante el entrenamiento?
-1. **Carga del Grafo:** Lee `santiago_master_walk.graphml` (RM completa).
-2. **Precalculo GPS:** Calcula las distancias Dijkstra hacia el destino (tarda ~2-5 segundos).
-3. **Rollout PPO:** El robot lanza múltiples agentes al mapa que aprenden por ensayo y error.
-4. **Exportación:** Genera `training_viz.json` con toda la telemetría de los intentos.
 
 ## 🎮 Visualización Profesional
 
@@ -83,14 +83,15 @@ python -m http.server 8080
 | ▶ PLAY | Reproducir/pausar la cinemática del robot. |
 | ◎ FOLLOW | Cámara de seguimiento LERP (suave) para grabación. |
 | ★ SUCCESS | Filtrar solo los episodios que llegaron a la meta. |
-| 🏆 TOP 3 | **Nuevo:** Muestra automáticamente los 3 mejores intentos (mayor recompensa). |
+| 🏆 TOP 3 | Muestra los 3 mejores intentos con mayor recompensa acumulada. |
 
 ## 🧠 Hiperparámetros de Élite
 
-- **Algorithm:** MaskablePPO (handling variable neighbors).
-- **Gamma:** 0.995 (priorizando el largo plazo).
-- **Ent_Coef:** 0.05 (forzando exploración/mutación).
-- **Max Steps:** 8000 por episodio.
+- **Algorithm:** MaskablePPO (sb3-contrib).
+- **Parallel Envs:** 15 (Vectorized).
+- **Gamma:** 0.995 (visión a largo plazo).
+- **Ent_Coef:** 0.05 (exploración/mutación agresiva).
+- **Max Steps:** 12,000 por episodio.
 
 ---
 *Built with 🧠 and 🦾 by MR_ROBOT Pipeline*

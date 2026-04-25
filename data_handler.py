@@ -128,13 +128,22 @@ def get_route_nodes(start_poi, end_poi, G_projected, G_latlon):
     Returns:
         (start_node, end_node): Tupla de node IDs
     """
-    # Geocodificar POIs
-    logger.info(f"Geocodificando origen: '{start_poi}'")
-    start_coords = ox.geocoder.geocode(start_poi)
+    def _parse_poi(poi_str):
+        try:
+            parts = [p.strip() for p in poi_str.split(',')]
+            if len(parts) == 2:
+                return (float(parts[0]), float(parts[1]))
+        except ValueError:
+            pass
+        return ox.geocoder.geocode(poi_str)
+
+    # Geocodificar o parsear POIs
+    logger.info(f"Resolviendo origen: '{start_poi}'")
+    start_coords = _parse_poi(start_poi)
     logger.info(f"  → Coordenadas: {start_coords}")
 
-    logger.info(f"Geocodificando destino: '{end_poi}'")
-    end_coords = ox.geocoder.geocode(end_poi)
+    logger.info(f"Resolviendo destino: '{end_poi}'")
+    end_coords = _parse_poi(end_poi)
     logger.info(f"  → Coordenadas: {end_coords}")
 
     # Transformar coordenadas geocodificadas (lat/lon) a UTM para buscar en grafo proyectado

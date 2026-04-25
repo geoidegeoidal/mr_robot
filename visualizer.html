@@ -361,13 +361,23 @@
             }
 
             // ── Origin marker ──
-            if (ep && ep._projected && ep._projected.length > 0) {
+            if (vizData && vizData.metadata && vizData.metadata.start_coords) {
+                const startLat = vizData.metadata.start_coords[0];
+                const startLon = vizData.metadata.start_coords[1];
+                const origin = projection([startLon, startLat]);
+                drawPOIMarker(origin, '#ff00ff', 'A');
+            } else if (ep && ep._projected && ep._projected.length > 0) {
                 const origin = ep._projected[0];
                 drawPOIMarker(origin, '#ff00ff', 'A');
             }
 
             // ── Destination marker ──
-            if (ep && ep._projected && ep._projected.length > 1) {
+            if (vizData && vizData.metadata && vizData.metadata.end_coords) {
+                const endLat = vizData.metadata.end_coords[0];
+                const endLon = vizData.metadata.end_coords[1];
+                const dest = projection([endLon, endLat]);
+                drawPOIMarker(dest, '#ffff00', 'B');
+            } else if (ep && ep._projected && ep._projected.length > 1) {
                 const dest = ep._projected[ep._projected.length - 1];
                 if (ep.result === 'success') {
                     drawPOIMarker(dest, '#ffff00', 'B');

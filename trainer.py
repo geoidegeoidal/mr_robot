@@ -20,6 +20,7 @@ from sb3_contrib import MaskablePPO
 from sb3_contrib.common.maskable.callbacks import MaskableEvalCallback
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 from data_handler import (
     load_or_download_graph,
@@ -36,7 +37,8 @@ START_POI = "Barrio Bellavista, Santiago, Chile"
 END_POI = "Plaza de Maipú, Maipú, Chile"
 
 # Hiperparámetros de entrenamiento
-TOTAL_TIMESTEPS = 500_000       # Con el nuevo "GPS", 500K es suficiente para llegar
+N_ENVS = 15                     # 🤖 Número de robots/caminantes en paralelo
+TOTAL_TIMESTEPS = 2_000_000       # Con el nuevo "GPS", 500K es suficiente para llegar
 LEARNING_RATE = 3e-4
 N_STEPS = 2048
 BATCH_SIZE = 64
@@ -45,7 +47,7 @@ GAMMA = 0.995                   # Descuento alto para rutas largas
 GAE_LAMBDA = 0.95
 CLIP_RANGE = 0.2
 ENT_COEF = 0.05                 # ¡MUTACIÓN! Aumentado a 0.05 para forzar exploración aleatoria
-MAX_STEPS_PER_EPISODE = 8000    # Permitir rutas largas en RM completa
+MAX_STEPS_PER_EPISODE = 12000    # Permitir rutas largas en RM completa
 
 # Output
 OUTPUT_DIR = os.path.dirname(__file__)
@@ -127,7 +129,7 @@ class TrajectoryLoggerCallback(BaseCallback):
 
 # ──────────────── Pipeline Principal ──────────────────────────
 
-def train():
+def train(start_poi=START_POI, end_poi=END_POI):
     """Pipeline completo de entrenamiento."""
 
     logger.info("=" * 60)
@@ -138,27 +140,35 @@ def train():
     logger.info("\n[1/5] Cargando grafo de la RM...")
     G_projected, G_latlon = load_or_download_graph()
 
-    # ── 2. Resolver POIs ──
+    # ── 2. Resolviendo POIs ──
     logger.info("\n[2/5] Resolviendo POIs...")
-    start_node, end_node = get_route_nodes(START_POI, END_POI, G_projected, G_latlon)
+    start_node, end_node = get_route_nodes(start_poi, end_poi, G_projected, G_latlon)
 
     # ── 3. Calcular max_degree y crear environment ──
     logger.info("\n[3/5] Configurando entorno...")
     max_degree = compute_max_degree(G_projected)
 
-    env = SantiagoUrbanEnv(
-        G_projected=G_projected,
-        G_latlon=G_latlon,
-        start_node=start_node,
-        end_node=end_node,
-        max_degree=max_degree,
-        max_steps=MAX_STEPS_PER_EPISODE,
-    )
+    # Función fábrica para crear cada entorno
+    def make_env():
+        def _init():
+            return SantiagoUrbanEnv(
+                G_projected=G_projected,
+                G_latlon=G_latlon,
+                start_node=start_node,
+                end_node=end_node,
+                max_degree=max_degree,
+                max_steps=MAX_STEPS_PER_EPISODE,
+            )
+        return _init
+
+    # 🤖 Vectorizamos: Creamos N_ENVS robots operando en el mismo mapa simultáneamente
+    env = DummyVecEnv([make_env() for _ in range(N_ENVS)])
 
     # ── 4. Entrenar ──
     logger.info("\n[4/5] Iniciando entrenamiento MaskablePPO...")
     logger.info(f"  Timesteps: {TOTAL_TIMESTEPS:,}")
-    logger.info(f"  Ruta: {START_POI} → {END_POI}")
+    logger.info(f"  Ruta: {start_poi} → {end_poi}")
+    logger.info(f"  Robots Simultáneos (Envs): {N_ENVS}")
     logger.info(f"  Max degree (action space): {max_degree}")
     logger.info(f"  Max steps/episodio: {MAX_STEPS_PER_EPISODE}")
 
@@ -196,14 +206,22 @@ def train():
     model.save(MODEL_PATH)
     logger.info(f"Modelo guardado: {MODEL_PATH}")
 
+    # Obtener coordenadas para la UI
+    start_data = G_latlon.nodes[start_node]
+    end_data = G_latlon.nodes[end_node]
+    start_coords = [start_data["y"], start_data["x"]] # lat, lon
+    end_coords = [end_data["y"], end_data["x"]]       # lat, lon
+
     # Exportar training_viz.json
     results = trajectory_callback.get_results()
     viz_data = {
         "metadata": {
-            "start_poi": START_POI,
-            "end_poi": END_POI,
+            "start_poi": start_poi,
+            "end_poi": end_poi,
             "start_node": int(start_node),
             "end_node": int(end_node),
+            "start_coords": start_coords,
+            "end_coords": end_coords,
             "total_timesteps": TOTAL_TIMESTEPS,
             **results,
         },
@@ -302,8 +320,18 @@ def evaluate(model_path=None, n_episodes=10):
 # ──────────────────────── Entry Point ─────────────────────────
 
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) > 1 and sys.argv[1] == "eval":
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="MR_ROBOT — Santiago Urban Navigator")
+    parser.add_argument("mode", nargs="?", default="train", choices=["train", "eval"], help="Modo de ejecución (train o eval)")
+    parser.add_argument("--start", type=str, default=START_POI, help="Punto de origen (POIs, ej: 'Plaza Italia, Santiago')")
+    parser.add_argument("--end", type=str, default=END_POI, help="Punto de destino (POIs, ej: 'Costanera Center, Santiago')")
+    
+    args = parser.parse_args()
+
+    if args.mode == "eval":
+        # Por ahora eval sigue usando los por defecto a menos que pasemos los args, pero lo ideal es simplificar
         evaluate()
     else:
-        train()
+        train(start_poi=args.start, end_poi=args.end)
+

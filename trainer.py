@@ -38,7 +38,7 @@ END_POI = "Plaza de Maipú, Maipú, Chile"
 
 # Hiperparámetros de entrenamiento
 N_ENVS = 15                     # 🤖 Número de robots/caminantes en paralelo
-TOTAL_TIMESTEPS = 2_000_000       # Con el nuevo "GPS", 500K es suficiente para llegar
+TOTAL_TIMESTEPS = 500_000       # Con el nuevo "GPS", 500K es suficiente para llegar
 LEARNING_RATE = 3e-4
 N_STEPS = 2048
 BATCH_SIZE = 64
@@ -148,6 +148,16 @@ def train(start_poi=START_POI, end_poi=END_POI):
     logger.info("\n[3/5] Configurando entorno...")
     max_degree = compute_max_degree(G_projected)
 
+    # 🚀 Optimización: Precalcular distancias Dijkstra una sola vez para todos los robots
+    logger.info("Precálculo global de distancias reales por las calles (Dijkstra)...")
+    try:
+        G_rev = G_projected.reverse(copy=False)
+        node_distances = nx.single_source_dijkstra_path_length(G_rev, end_node, weight='length')
+        logger.info(f"Distancias calculadas para {len(node_distances)} nodos.")
+    except Exception as e:
+        logger.error(f"Error en precálculo global: {e}")
+        node_distances = {}
+
     # Función fábrica para crear cada entorno
     def make_env():
         def _init():
@@ -158,6 +168,7 @@ def train(start_poi=START_POI, end_poi=END_POI):
                 end_node=end_node,
                 max_degree=max_degree,
                 max_steps=MAX_STEPS_PER_EPISODE,
+                node_distances=node_distances,  # Compartir el mismo dict en memoria
             )
         return _init
 

@@ -40,6 +40,9 @@ Hemos implementado **15 entornos en paralelo** (`N_ENVS = 15`). Esto significa q
 ### 📍 Smart Parsing (Texto o Coordenadas)
 El sistema resuelve automáticamente si le pasas una dirección textual ("Plaza Italia") o coordenadas geográficas directas ("-33.43, -70.63").
 
+### ⚡ Optimización de Cómputo (Shared Map)
+Para manejar 15 robots simultáneos, el sistema ahora precalcula el mapa de distancias una sola vez al inicio y lo comparte entre todos los hilos, reduciendo el consumo de RAM y el tiempo de arranque en un 90%.
+
 ## ⚡ Setup Rápido
 
 ```bash

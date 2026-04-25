@@ -40,7 +40,7 @@ class SantiagoUrbanEnv(gym.Env):
     metadata = {"render_modes": ["human"]}
 
     def __init__(self, G_projected, G_latlon, start_node, end_node,
-                 max_degree, max_steps=5000):
+                 max_degree, max_steps=5000, node_distances=None):
         """
         Args:
             G_projected: Grafo proyectado a UTM 19S (metros)
@@ -49,6 +49,7 @@ class SantiagoUrbanEnv(gym.Env):
             end_node: ID del nodo objetivo
             max_degree: Grado máximo del grafo (define action space)
             max_steps: Máximo de pasos por episodio
+            node_distances: Dict opcional {node_id: distance} precalculado
         """
         super().__init__()
 
@@ -64,15 +65,17 @@ class SantiagoUrbanEnv(gym.Env):
         self.end_y = end_data["y"]
 
         # ── Precomputar distancias reales (GPS / Grafo) ──
-        logger.info("Precálculo de distancias reales por las calles (Dijkstra)...")
-        # Al revertir el grafo, calculamos las rutas más cortas *hacia* end_node
-        try:
-            G_rev = self.G.reverse(copy=False)
-            self.node_distances = nx.single_source_dijkstra_path_length(G_rev, end_node, weight='length')
-            logger.info(f"Distancias calculadas para {len(self.node_distances)} nodos accesibles.")
-        except Exception as e:
-            logger.error(f"Error precalculando distancias: {e}")
-            self.node_distances = {}
+        if node_distances is not None:
+            self.node_distances = node_distances
+        else:
+            logger.info("Precálculo de distancias reales por las calles (Dijkstra)...")
+            try:
+                G_rev = self.G.reverse(copy=False)
+                self.node_distances = nx.single_source_dijkstra_path_length(G_rev, end_node, weight='length')
+                logger.info(f"Distancias calculadas para {len(self.node_distances)} nodos accesibles.")
+            except Exception as e:
+                logger.error(f"Error precalculando distancias: {e}")
+                self.node_distances = {}
 
 
         # ── Spaces ──

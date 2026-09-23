@@ -6,6 +6,8 @@ Pipeline de Reinforcement Learning para entrenar una IA que navegue de forma aut
 ![D3.js](https://img.shields.io/badge/D3.js-v7-orange?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
+> **Estado: prototipo experimental.** La navegación, las métricas de entrenamiento y la visualización son trabajo exploratorio; los resultados no están validados para uso operativo.
+
 ## 🏗️ Arquitectura del Sistema
 
 ```
@@ -98,3 +100,4 @@ python -m http.server 8080
 
 ---
 *Built with 🧠 and 🦾 by MR_ROBOT Pipeline*
+

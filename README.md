@@ -73,7 +73,12 @@ Abre [http://localhost:8080/visualizer.html](http://localhost:8080/visualizer.ht
 
 ## Arquitectura
 
-**Red peatonal → entorno de navegación → entrenamiento → archivos de resultados → visualizador.**
+![Flujo de MR_ROBOT: la red peatonal alimenta el entorno y el entrenamiento; training_viz.json y streets.geojson alimentan el visualizador. La evaluación exporta eval_viz.json por separado.](docs/readme/training-workflow.svg)
+
+La red peatonal pasa al entorno de navegación y al entrenamiento. El visualizador carga
+`training_viz.json` y `streets.geojson`; `python trainer.py eval` genera `eval_viz.json`
+en una ejecución separada, no como entrada del visualizador.
+[Fuente editable del diagrama](docs/readme/training-workflow.html).
 
 | Componente | Responsabilidad |
 |---|---|

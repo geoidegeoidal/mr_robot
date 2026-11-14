@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MR_ROBOT · Flujo de entrenamiento</title>
+  <style>
+    body { margin: 0; background: #050505; }
+    main { max-width: 960px; margin: auto; }
+    svg { display: block; width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+<main>
+<!-- Source: README.md training/evaluation contract; visualizer.html palette and type families.
+     Edit this inline SVG, then copy the complete <svg>...</svg> element verbatim to
+     training-workflow.svg. No external fonts are loaded; system fallbacks are intentional. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="600" viewBox="0 0 960 600" role="img" aria-labelledby="training-workflow-title training-workflow-desc">
+  <title id="training-workflow-title">MR_ROBOT: del grafo peatonal al visualizador</title>
+  <desc id="training-workflow-desc">La red peatonal alimenta el entorno y el entrenamiento; training_viz.json y streets.geojson alimentan visualizer.html. Una evaluación independiente del modelo genera eval_viz.json, que no se carga en el visualizador.</desc>
+  <defs>
+    <marker id="training-workflow-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 8 4 L 0 8 Z" fill="#a2adb4"/>
+    </marker>
+  </defs>
+  <style>
+    text { fill: #e0e0e0; font-family: Arial, Helvetica, sans-serif; }
+    .brand { font-family: Orbitron, Arial, Helvetica, sans-serif; font-weight: 700; }
+    .mono { font-family: 'Share Tech Mono', Consolas, 'Liberation Mono', monospace; }
+    .label { font-size: 18px; font-weight: 700; }
+    .detail { font-size: 16px; fill: #b8c0c5; }
+    .node { fill: #111518; stroke: #56636a; stroke-width: 1.5; }
+    .focus { fill: #081c1e; stroke: #00f2ff; stroke-width: 2; }
+    .flow { fill: none; stroke: #a2adb4; stroke-width: 2; marker-end: url(#training-workflow-arrow); }
+  </style>
+  <rect width="960" height="600" fill="#050505"/>
+  <text x="28" y="48" class="brand" font-size="16" fill="#00f2ff" style="fill:#00f2ff" letter-spacing="3">MR_ROBOT</text>
+  <text x="28" y="92" font-size="28" font-weight="700">Del entrenamiento a la visualización</text>
+  <text x="28" y="124" class="detail">Qué se conecta y qué archivo pertenece a cada ejecución.</text>
+
+  <!-- Main flow: five stages, left to right. Connectors precede the nodes. -->
+  <path class="flow" d="M 158 248 H 182"/>
+  <path class="flow" d="M 330 248 H 354"/>
+  <path class="flow" d="M 510 248 H 534"/>
+  <path class="flow" d="M 762 248 H 786"/>
+  <path class="flow" d="M 432 312 V 408" stroke-dasharray="6 5"/>
+  <rect x="448" y="336" width="300" height="44" fill="#050505"/>
+  <text x="448" y="356" class="detail">Modelo guardado → evaluación aparte</text>
+  <text x="448" y="380" class="mono detail">python trainer.py eval</text>
+
+  <rect x="26" y="184" width="132" height="128" rx="8" class="node"/>
+  <text x="42" y="212" class="mono detail">01 / DATOS</text>
+  <text x="42" y="244" class="label">Red</text>
+  <text x="42" y="268" class="label">peatonal</text>
+  <text x="42" y="292" class="detail">Grafo local</text>
+
+  <rect x="182" y="184" width="148" height="128" rx="8" class="node"/>
+  <text x="198" y="212" class="mono detail">02 / ENTORNO</text>
+  <text x="198" y="244" class="label">Navegación</text>
+  <text x="198" y="268" class="detail">Acciones y</text>
+  <text x="198" y="292" class="detail">recompensas</text>
+
+  <rect x="354" y="184" width="156" height="128" rx="8" class="focus"/>
+  <text x="370" y="212" class="mono detail">03 / APRENDER</text>
+  <text x="366" y="244" class="label">Entrenamiento</text>
+  <text x="370" y="272" class="mono" font-size="16">trainer.py</text>
+  <text x="370" y="296" class="detail">MaskablePPO</text>
+
+  <rect x="534" y="184" width="228" height="128" rx="8" class="node"/>
+  <text x="550" y="212" class="mono detail">04 / EXPORTAR</text>
+  <text x="550" y="244" class="label">Archivos para la vista</text>
+  <text x="550" y="272" class="mono" font-size="17">training_viz.json</text>
+  <text x="550" y="296" class="mono" font-size="17">streets.geojson</text>
+
+  <rect x="786" y="184" width="148" height="128" rx="8" class="focus"/>
+  <text x="802" y="212" class="mono detail">05 / VER</text>
+  <text x="802" y="244" class="label">Visualizador</text>
+  <text x="794" y="272" class="mono" font-size="15">visualizer.html</text>
+  <text x="802" y="296" class="detail">Calles y rutas</text>
+
+  <rect x="354" y="408" width="400" height="112" rx="8" class="node"/>
+  <text x="374" y="440" class="label">Salida de evaluación</text>
+  <text x="374" y="468" class="mono" font-size="20">eval_viz.json</text>
+  <text x="374" y="496" class="detail">No es una entrada del visualizador.</text>
+  <rect x="374" y="506" width="36" height="2" fill="#ff3366"/>
+
+  <path d="M 28 548 H 932" stroke="#344047"/>
+  <circle cx="34" cy="572" r="4" fill="#00ff88"/>
+  <text x="48" y="578" class="detail">Proyecto experimental · el flujo no garantiza rutas válidas ni óptimas.</text>
+</svg>
+</main>
+</body>
+</html>
